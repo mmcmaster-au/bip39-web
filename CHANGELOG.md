@@ -1,3 +1,8 @@
+# 1.0.0
+__breaking changes__
+- Ported original bip39 package to support running within web browsers.
+- All methods are now Async
+
 # 3.0.0
 __added__
 - Added TypeScript support (#104)

@@ -1,6 +1,3 @@
-import * as createHash from 'create-hash';
-import { pbkdf2, pbkdf2Sync } from 'pbkdf2';
-import * as randomBytes from 'randombytes';
 import { _default as _DEFAULT_WORDLIST, wordlists } from './_wordlists';
 
 let DEFAULT_WORDLIST: string[] | undefined = _DEFAULT_WORDLIST;
@@ -12,29 +9,8 @@ const WORDLIST_REQUIRED =
   'A wordlist is required but a default could not be found.\n' +
   'Please pass a 2048 word array explicitly.';
 
-function pbkdf2Promise(
-  password: string | Buffer,
-  saltMixin: string | Buffer,
-  iterations: number,
-  keylen: number,
-  digest: string,
-): Promise<Buffer> {
-  return Promise.resolve().then(
-    (): Promise<Buffer> =>
-      new Promise(
-        (resolve, reject): void => {
-          const callback = (err: Error, derivedKey: Buffer): void => {
-            if (err) {
-              return reject(err);
-            } else {
-              return resolve(derivedKey);
-            }
-          };
-          pbkdf2(password, saltMixin, iterations, keylen, digest, callback);
-        },
-      ),
-  );
-}
+const webcrypto =
+  typeof crypto !== 'undefined' ? crypto : require('crypto').webcrypto;
 
 function normalize(str?: string): string {
   return (str || '').normalize('NFKD');
@@ -55,47 +31,66 @@ function bytesToBinary(bytes: number[]): string {
   return bytes.map((x: number): string => lpad(x.toString(2), '0', 8)).join('');
 }
 
-function deriveChecksumBits(entropyBuffer: Buffer): string {
+async function deriveChecksumBitsAsync(entropyBuffer: Buffer): Promise<string> {
   const ENT = entropyBuffer.length * 8;
   const CS = ENT / 32;
-  const hash = createHash('sha256')
-    .update(entropyBuffer)
-    .digest();
+  const hash = await webcrypto.subtle.digest(
+    'SHA-256',
+    new Uint8Array(
+      entropyBuffer.buffer,
+      entropyBuffer.byteOffset,
+      entropyBuffer.byteLength,
+    ),
+  );
 
-  return bytesToBinary(Array.from(hash)).slice(0, CS);
+  return bytesToBinary(Array.from(new Uint8Array(hash))).slice(0, CS);
 }
 
 function salt(password?: string): string {
   return 'mnemonic' + (password || '');
 }
 
-export function mnemonicToSeedSync(
-  mnemonic: string,
-  password?: string,
-): Buffer {
-  const mnemonicBuffer = Buffer.from(normalize(mnemonic), 'utf8');
-  const saltBuffer = Buffer.from(salt(normalize(password)), 'utf8');
-
-  return pbkdf2Sync(mnemonicBuffer, saltBuffer, 2048, 64, 'sha512');
-}
-
-export function mnemonicToSeed(
+export async function mnemonicToSeedAsync(
   mnemonic: string,
   password?: string,
 ): Promise<Buffer> {
-  return Promise.resolve().then(
-    (): Promise<Buffer> => {
-      const mnemonicBuffer = Buffer.from(normalize(mnemonic), 'utf8');
-      const saltBuffer = Buffer.from(salt(normalize(password)), 'utf8');
-      return pbkdf2Promise(mnemonicBuffer, saltBuffer, 2048, 64, 'sha512');
-    },
+  const mnemonicBuffer = Buffer.from(normalize(mnemonic), 'utf8');
+  const saltBuffer = Buffer.from(salt(normalize(password)), 'utf8');
+
+  const key = await webcrypto.subtle.importKey(
+    'raw',
+    new Uint8Array(
+      mnemonicBuffer.buffer,
+      mnemonicBuffer.byteOffset,
+      mnemonicBuffer.byteLength,
+    ),
+    'PBKDF2', // { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey'],
   );
+
+  const seedBits = await webcrypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: new Uint8Array(
+        saltBuffer.buffer,
+        saltBuffer.byteOffset,
+        saltBuffer.byteLength,
+      ),
+      iterations: 2048,
+      hash: 'SHA-512',
+    },
+    key,
+    512,
+  );
+
+  return Buffer.from(seedBits);
 }
 
-export function mnemonicToEntropy(
+export async function mnemonicToEntropyAsync(
   mnemonic: string,
   wordlist?: string[],
-): string {
+): Promise<string> {
   wordlist = wordlist || DEFAULT_WORDLIST;
   if (!wordlist) {
     throw new Error(WORDLIST_REQUIRED);
@@ -138,18 +133,21 @@ export function mnemonicToEntropy(
   }
 
   const entropy = Buffer.from(entropyBytes);
-  const newChecksum = deriveChecksumBits(entropy);
+  const newChecksum = await deriveChecksumBitsAsync(entropy);
   if (newChecksum !== checksumBits) {
+    console.log(entropy.toString('hex'));
+
+    console.log('Expected ' + checksumBits + ' actual: ' + newChecksum);
     throw new Error(INVALID_CHECKSUM);
   }
 
   return entropy.toString('hex');
 }
 
-export function entropyToMnemonic(
+export async function entropyToMnemonicAsync(
   entropy: Buffer | string,
   wordlist?: string[],
-): string {
+): Promise<string> {
   if (!Buffer.isBuffer(entropy)) {
     entropy = Buffer.from(entropy, 'hex');
   }
@@ -170,7 +168,7 @@ export function entropyToMnemonic(
   }
 
   const entropyBits = bytesToBinary(Array.from(entropy));
-  const checksumBits = deriveChecksumBits(entropy);
+  const checksumBits = await deriveChecksumBitsAsync(entropy);
 
   const bits = entropyBits + checksumBits;
   const chunks = bits.match(/(.{1,11})/g)!;
@@ -186,26 +184,33 @@ export function entropyToMnemonic(
     : words.join(' ');
 }
 
-export function generateMnemonic(
+export async function generateMnemonicAsync(
   strength?: number,
   rng?: (size: number) => Buffer,
   wordlist?: string[],
-): string {
+): Promise<string> {
   strength = strength || 128;
   if (strength % 32 !== 0) {
     throw new TypeError(INVALID_ENTROPY);
   }
-  rng = rng || randomBytes;
 
-  return entropyToMnemonic(rng(strength / 8), wordlist);
+  if (!rng) {
+    rng = (size: number): Buffer => {
+      const rngValues = new Uint8Array(size);
+      webcrypto.getRandomValues(rngValues);
+      return Buffer.from(rngValues);
+    };
+  }
+
+  return entropyToMnemonicAsync(rng(strength / 8), wordlist);
 }
 
-export function validateMnemonic(
+export async function validateMnemonicAsync(
   mnemonic: string,
   wordlist?: string[],
-): boolean {
+): Promise<boolean> {
   try {
-    mnemonicToEntropy(mnemonic, wordlist);
+    await mnemonicToEntropyAsync(mnemonic, wordlist);
   } catch (e) {
     return false;
   }
