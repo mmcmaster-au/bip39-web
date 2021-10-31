@@ -1,7 +1,7 @@
 # BIP39
 
-[![Build Status](https://travis-ci.org/bitcoinjs/bip39.png?branch=master)](https://travis-ci.org/bitcoinjs/bip39)
-[![NPM](https://img.shields.io/npm/v/bip39.svg)](https://www.npmjs.org/package/bip39)
+[![Build Status](https://travis-ci.org/mcmaster-au/bip39-web.png?branch=master)](https://travis-ci.org/mcmaster-au/bip39-web)
+[![NPM](https://img.shields.io/npm/v/bip39-web.svg)](https://www.npmjs.org/package/bip39-web)
 
 [![js-standard-style](https://cdn.rawgit.com/feross/standard/master/badge.svg)](https://github.com/feross/standard)
 
@@ -23,7 +23,7 @@ However, there should be other checks in place, such as checking to make sure th
  For example, if we want to exclude all wordlists besides chinese_simplified, you could build using the browserify command below.
 
  ```bash
-$ browserify -r bip39 -s bip39 \
+$ browserify -r bip39-web -s bip39-web \
   --exclude=./wordlists/english.json \
   --exclude=./wordlists/japanese.json \
   --exclude=./wordlists/spanish.json \
@@ -33,7 +33,7 @@ $ browserify -r bip39 -s bip39 \
   --exclude=./wordlists/czech.json \
   --exclude=./wordlists/portuguese.json \
   --exclude=./wordlists/chinese_traditional.json \
-   > bip39.browser.js
+   > bip39-web.browser.js
 ```
 
  This will create a bundle that only contains the chinese_simplified wordlist, and it will be the default wordlist for all calls without explicit wordlists.
@@ -90,7 +90,7 @@ undefined
 
 ## Installation
 ``` bash
-npm install bip39
+npm install bip39-web
 ```
 
 ## Examples
@@ -125,7 +125,7 @@ await bip39.validateMnemonicAsync('basket actual')
 
 
 ``` js
-const bip39 = require('bip39')
+const bip39 = require('bip39-web')
 
 // defaults to BIP39 English word list
 // uses HEX strings for entropy
