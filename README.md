@@ -1,6 +1,5 @@
-# BIP39
+# BIP39-WEB
 
-[![Build Status](https://travis-ci.org/mcmaster-au/bip39-web.png?branch=master)](https://travis-ci.org/mcmaster-au/bip39-web)
 [![NPM](https://img.shields.io/npm/v/bip39-web.svg)](https://www.npmjs.org/package/bip39-web)
 
 [![js-standard-style](https://cdn.rawgit.com/feross/standard/master/badge.svg)](https://github.com/feross/standard)
