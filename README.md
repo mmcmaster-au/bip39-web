@@ -15,6 +15,15 @@ When a checksum is invalid, warn the user that the phrase is not something gener
 
 However, there should be other checks in place, such as checking to make sure the user is inputting 12 words or more separated by a space. ie. `phrase.trim().split(/\s+/g).length >= 12`
 
+## Using within angular
+Add the following to your packages.json file to avoid overriding the the built-in browser 'crypto' object. Failure to do so results in the error `Module not found: Error: Can't resolve 'crypto'`
+
+```json
+"browser": {
+    "crypto": false
+}
+```
+
 ## Removing wordlists from webpack/browserify
 
  Browserify/Webpack bundles can get very large if you include all the wordlists, so you can now exclude wordlists to make your bundle lighter.
